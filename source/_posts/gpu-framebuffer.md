@@ -23,16 +23,16 @@ IMR管线
 
 ## 立即模式渲染器的内存使用
 
-A naïve implementation of an immediate-mode renderer might use a large amount of memory bandwidth. The next diagram shows that a large amount of memory is transferred during rasterization even with a simple cache for the framebuffer pixels and depth values. IMRs cause memory to be accessed in an unpredictable order, determined by the way triangles are submitted.
+一个单纯的IMR的实现可能会花费大量的内存带宽. 下面这张图展示了即便对帧缓存的颜色与深度做了一个简单的缓冲, 也会造成光栅化过程中大量的内存数据传送. IMR在访问内存时的顺序是不可预测的, 取决于三角形提交的顺序.
 
-_In this diagram, four "cache lines" of consecutive image memory are shown above the image as it is rendered. Above each cache line is a miniature rectangle showing where the pixels corresponding to the cache line fall in the framebuffer: red for "dirty" cache lines that have been written to, green for "clean" cache lines that still match memory, and brighter colors for cache lines that have been accessed more recently. Framebuffer pixels corresponding to "dirty" cache lines are shown in magenta (framebuffer) and white (depth buffer)._
+_在下面这张图中, 图片的上方显示了内存中连续4条的缓冲线在渲染过程中的情况. 在每条缓冲线上方有一个小的矩形, 代表这个缓冲线落在了帧缓存的哪个位置: 红色线条代表缓冲线被写入, 处于脏的状态, 绿色代表数据和内存一致, 处于干净的状态, 随着写入的时间推移, 红色会越来越浅. 而在下方的帧缓存图像中, 颜色缓存上粉红色代表脏的缓冲线, 深度缓存中则是用白色来代表._
 
 ![Rendering with linear cachelines](/gpu-framebuffer/images/tech_GPUFramebuffer_06.gif)
 Rendering with linear cachelines
 
-## Tiled memory
+## 图块化内存
 
-The first step towards reducing memory bandwidth is to treat each cache line as covering a two-dimensional rectangular area (a "tile") in memory. Triangles that are near to each other in space are often submitted near each other in time (in this example, each "spike" of the object is drawn before moving on to the next), so better grouping of the cache area results in more cache hits. With square cache areas that are the same size as a linear cache, more rendering happens within the cache, and transfers to memory are less frequent - we've reduced external memory bandwidth! A similar technique is often used in texture storage, since the reading of texture values similarly shows spatial locality of reference.
+减少内存带宽的第一步是把每个缓冲线覆盖内存中一个块二维的区域(一个图块). 在空间中相互邻近的三角形往往也会一起提交The first step towards reducing memory bandwidth is to treat each cache line as covering a two-dimensional rectangular area (a "tile") in memory. Triangles that are near to each other in space are often submitted near each other in time (in this example, each "spike" of the object is drawn before moving on to the next), so better grouping of the cache area results in more cache hits. With square cache areas that are the same size as a linear cache, more rendering happens within the cache, and transfers to memory are less frequent - we've reduced external memory bandwidth! A similar technique is often used in texture storage, since the reading of texture values similarly shows spatial locality of reference.
 
 This example is simplified - actual hardware may use more complex mappings between pixels and memory in order to further improve locality of reference.
 
