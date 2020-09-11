@@ -11,72 +11,72 @@ tags:
 
 _下面的图片, 包括之后所有的图片, 都是左侧显示颜色缓冲, 右侧显示深度缓冲_
 
-![Simple ](/gpu-framebuffer/images/tech_GPUFramebuffer_01.gif)
+![简单的立即模式渲染过程](/gpu-framebuffer/images/tech_GPUFramebuffer_01.gif)
 简单的立即模式渲染过程
 
 这些三角形一提交就会被硬件处理, 如上图所示, 称之为立即模式渲染器(IMR). 过去, 桌面和主机的GPU的做法都可以概略地认为是这样.
 
 _在立即模式渲染器中, 图形渲染管线从上至下地处理各个原语, 逐原语的方式访问内存._
 
-![Pipeline of an ](/gpu-framebuffer/images/tech_GPUFramebuffer_03.svg)
+![IMR管线](/gpu-framebuffer/images/tech_GPUFramebuffer_03-cn.svg)
 IMR管线
 
 ## 立即模式渲染器的内存使用
 
-一个单纯的IMR的实现可能会花费大量的内存带宽. 下面这张图展示了即便对帧缓存的颜色与深度做了一个简单的缓冲, 也会造成光栅化过程中大量的内存数据传送. IMR在访问内存时的顺序是不可预测的, 取决于三角形提交的顺序.
+一个单纯的IMR的实现可能会花费大量的内存带宽. 下面这张图展示了即便对帧缓冲的颜色与深度做了一个简单的缓存, 也会造成光栅化过程中大量的内存数据传送. IMR在访问内存时的顺序是不可预测的, 取决于三角形提交的顺序.
 
-_在下面这张图中, 图片的上方显示了内存中连续4条的缓冲线在渲染过程中的情况. 在每条缓冲线上方有一个小的矩形, 代表这个缓冲线落在了帧缓存的哪个位置: 红色线条代表缓冲线被写入, 处于脏的状态, 绿色代表数据和内存一致, 处于干净的状态, 随着写入的时间推移, 红色会越来越浅. 而在下方的帧缓存图像中, 颜色缓存上粉红色代表脏的缓冲线, 深度缓存中则是用白色来代表._
+_在下面这张图中, 图片的上方显示了内存中连续4个的缓存行在渲染过程中的情况. 在每个缓存行上方有一个小的矩形, 代表这个缓存行落在了帧缓冲的哪个位置: 红色线条代表缓存行被写入, 处于脏的状态, 绿色代表数据和内存一致, 处于干净的状态, 随着写入的时间推移, 红色会越来越浅. 而在下方的帧缓冲图像中, 颜色缓冲上粉红色代表脏的缓存行, 深度缓冲中则是用白色来代表._
 
-![Rendering with linear cachelines](/gpu-framebuffer/images/tech_GPUFramebuffer_06.gif)
-Rendering with linear cachelines
+![使用缓存行进行渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_06.gif)
+使用缓存行进行渲染
 
 ## 图块化内存
 
-减少内存带宽的第一步是把每个缓冲线覆盖内存中一个块二维的区域(一个图块). 在空间中相互邻近的三角形往往也会一起提交The first step towards reducing memory bandwidth is to treat each cache line as covering a two-dimensional rectangular area (a "tile") in memory. Triangles that are near to each other in space are often submitted near each other in time (in this example, each "spike" of the object is drawn before moving on to the next), so better grouping of the cache area results in more cache hits. With square cache areas that are the same size as a linear cache, more rendering happens within the cache, and transfers to memory are less frequent - we've reduced external memory bandwidth! A similar technique is often used in texture storage, since the reading of texture values similarly shows spatial locality of reference.
+减少内存带宽的第一步是把每个缓存行覆盖内存中一个块二维的区域(一个图块). 在空间中相互邻近的三角形往往也会一起提交, 在上面这个例子中, 可以看到物件的每个尖刺都是先整体描绘完才去画下一个的, 更好地对缓存区域进行分组能够获得更好的命中率. 使用正方形的缓存区域, 总面积和线型区域是一样的, 但是会囊括更多的描绘, 就能减少内存数据的传输的频繁程度, 这样就能减少额外的带宽了! 相同的技术也常用于纹理的存储, 因为纹理数据的读取也表现除了空间上的引用局部性.
 
-This example is simplified - actual hardware may use more complex mappings between pixels and memory in order to further improve locality of reference.
+这个例子是被简化过的 - 现在的硬件会使用更复杂的像素与内存之间的映射机制来提高引用局部性.
 
-_This time the four cache lines (spaced out horizontally) each cover a square area in the framebuffer and depth buffer. The cached framebuffer area is now shown above the corresponding cached depth buffer area. The cache lines hold the same number of pixels as for the linear cache in the previous example._
+_如下图所示, 此时的4个缓存行分别覆盖帧缓冲和深度缓冲上的一块正方形区域. 上方显示了覆盖区域在两个缓冲中的位置. 这些缓存行覆盖的像素和之前是一样多的._
 
-![Rendering with square cache tiles](/gpu-framebuffer/images/tech_GPUFramebuffer_07.gif)
-Rendering with square cache tiles
+![使用正方形的缓存图块进行渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_07.gif)
+使用正方形的缓存图块进行渲染
 
-## Rasterizing within tiles
+## 使用图块进行光栅化
 
-In a real-world situation, the framebuffer would likely be larger relative to the cached tiles. One problem with the technique we've shown so far is that a large triangle might thrash the cache if drawn in simple top-to-bottom order, since each horizontal line on the screen might cover more tiles than can fit in the cache. We can solve this problem by changing the order in which the pixels within a triangle are rasterized: we can draw all the pixels that the triangle covers within one tile before moving on to the next tile.
+在实际情况中, 帧缓冲会比缓存图块大很多. 当要渲染一个大的三角形, 并且简单地从上之下地那么逐行渲染, 就会造成缓存抖动, 因为屏幕上的一条水平线所包含的图块要比缓存中的图块来的多. 要解决这个问题, 我们可以改变三角形中像素的光栅化顺序: 我们可以先把一个图块中属于这个三角形的所有像素先画出来, 然后再移动到下一个图块.
 
-Since in our simple example the cache can cover the entire framebuffer width, this approach doesn't reduce the number of memory transfers that are performed. However, we can see the difference - rendering for a triangle completes in one cached tile before moving to the next.
+由于在这个简单的例子中, 缓存的图块正好能填满帧缓冲的宽, 所以使用这种方式进行光栅化并不能减少内存数据的传输数量. 但是, 我们能看到两者之间的区别 - 先把一个缓存图块内的三角形部分画完, 再去处理下一个图块.
 
-_Note: This animation takes longer than the last one because the image is updated after each tile has processed a triangle; the previous animation updated only after each triangle was completely rendered and during transfers between tiles an memory. In real hardware, performance would be the same - and, if the previous approach caused the cache to thrash, the performance of this version would be better._
+_下面这个动画花费的时间比上一个动画长, 因为这个动画在三角形内的一个图块更新时都会截取一帧, 而上一个动画则是在一个三角形完成渲染后或者图块与内存之间进行了数据传输后才会截取一帧. 在真实的硬件上, 两者的性能应该是一致的, 并且, 如果上一个方法造成了缓存的抖动, 那么这个版本的性能会更优._
 
-![Rendering a tile at a time](/gpu-framebuffer/images/tech_GPUFramebuffer_10.gif)
-Rendering a tile at a time
+![一次渲染一个图块](/gpu-framebuffer/images/tech_GPUFramebuffer_10.gif)
+一次渲染一个图块
 
-We would get even better memory access if, rather than just processing all the pixels corresponding to one triangle before moving on to the next tile, we processed the pixels for all the triangles in the scene. This is the optimization performed by tile-based renderers (or "TBRs").
+我们还可以继续优化对内存的访问, 不要在处理完当前图块的一个三角形内的像素就处理下一个图块, 可以把场景中所有的三角形都处理完, 再移动到下一个图块. 这个就是基于图块的渲染器(TBR)所使用的优化方法.
 
-## Binning
+## 分箱(Binning)
 
-The first step of tile-based rendering is to determine which triangles affect each tile. A primitive implementation of a tile-based renderer could simply render the entire scene for each tile, clipped to the area covered by the cache. In practice, with large framebuffers and relatively small tiles, this would be very inefficient. Instead, when geometry is submitted for rendering, rather than being immediately rasterized, it is "binned" to a structure in memory that determines which tiles it could affect. Note that this process involves vertex shading, since this affects the location of triangles, but not fragment shading.
+TBR的第一步就是确定每个图块分别受到哪些三角形的影响. 一个TBR的最原始的实现是对每个图块把场景中的所有三角形渲染一遍, 再将超出图块的部分裁剪掉. 但在实际使用的时候, 帧缓冲相对于图块来说非常得大, 这个方法非常的没有效率. 取而代之的方法是, 当一个三角形被提交, 先不立即对它进行光栅化, 而是分箱到一个内存中的结构中, 这个结构定义了它影响到了哪些图块. 注意, 这个操作包含了顶点着色, 因为这和三角形的位置相关, 不过和片元着色无关.
 
-_This diagram shows each triangle of our scene being "binned" into twelve tiles that cover the frame buffer in a 4x3 pattern. The "framebuffer" at the bottom shows the triangle as it is submitted. Above the full-size framebuffer is a 4x3 arrangement of miniature framebuffers, each showing only the triangles that have been "binned" into the corresponding rectangular tile of the image; the area corresponding to the tile is faintly outlined._
+_下面这张图演示了场景中的各个三角形是如何分箱到12个图块中, 整个帧缓冲正好可以分成4x3个图块. 下方的帧缓冲显示当前提交的三角形, 上方则按照4x3的方式排列着12个缩小的帧缓冲, 每个帧缓冲只显示被分箱到对应图块的三角形, 图块对应的区域由一条红线框出._
 
-![Sorting triangles into bins](/gpu-framebuffer/images/tech_GPUFramebuffer_12.gif)
-Sorting triangles into bins
+![将三角形分箱](/gpu-framebuffer/images/tech_GPUFramebuffer_12.gif)
+将三角形分箱
 
-## Tile-based rasterization
+## 基于图块的光栅化
 
-Once the geometry has been sorted into bins, the rasterizer can process the scene one bin at a time, writing only to local tile memory until processing of the tile is finished. Since each tile is processed only once, the "cache" is now reduced to a single tile. This in-order processing includes clearing the framebuffer - all of the framebuffer is "dirty" until the tile is processed.
+当三角形完成分箱后, 光栅器就可以按箱来进行处理, 每次只对一个图块的内存进行写入, 直到这个图块处理完毕. 由于每个图块只处理一次, 那么缓存就减少到了一个图块那么大. 这个顺序操作包含了清空帧缓冲, 在图块处理过程中, 整个帧缓冲都是脏的.
 
-![Tiled rendering](/gpu-framebuffer/images/tech_GPUFramebuffer_14.gif)
-Tiled rendering
+![按图块进行渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_14.gif)
+按图块进行渲染
 
-_Rendering has now been broken into two stages: binning, which writes to memory, then rasterization, that reads the bin contents. The intermediate store of geometry is typically small relative to the framebuffer, and is accessed in an ordered way._
+_渲染分成了两个阶段: 分箱, 这步需要写内存; 光栅化, 需要读取箱内数据. 几何数据的中间存储相对于帧缓冲一般而言是更小的, 并且会顺序地进行访问._
 
-![](/gpu-framebuffer/images/tech_GPUFramebuffer_16.svg)
+![](/gpu-framebuffer/images/tech_GPUFramebuffer_16-cn.svg)
 
-Because the rasterization of tiles cannot begin until all the geometry has been processed, tile-based rendering introduces latency compared with immediate-mode rendering. In return, the reduction in bandwidth increases the rasterization speed. In some tile-based rendering hardware, the binning and rasterizing operations are pipelined. Therefore any operation that limits this parallelism (such as a vertex shader that depends on the previous frame's output, or a texture which is modified frame-by-frame and is not double-buffered) introduces a "bubble" that reduces performance. Additionally some tile-based rendering hardware is limited in the amount of geometry which can be processed in the binning pass.
+由于需要等到所有的几何数据提交完毕才能开始光栅化, 所以和立即模式相比, 基于图块的渲染会有一个延迟. 而这个延迟带来的回报则是减少带宽, 增快光栅化速度. 在某些TBR的硬件上, 分箱和光栅化是流水线化的. 因此, 任何限制了并行性的操作都会造成性能问题, 比如说一个顶点着色器需要使用前一帧的输出, 一个纹理每一帧都会修改, 并且没有使用双缓冲. 另外, 某些TBR的硬件限制了分箱阶段的几何数据的数量.
 
-Nonetheless, the bandwidth reduction of tile-based rendering means that almost all mobile hardware is based on tiling. Even traditional desktop IMR vendors are moving towards a partly tiled approach with their latest hardware. This means that both desktop and mobile platforms can benefit from API changes designed to support tillers (such as Vulkan Subpasses).
+尽管如此, 带宽的节省对于移动设备来说还是最重要的, 所以几乎所有的移动设备都使用了TBR. 甚至传统的桌面IMR供应商也在他们的新硬件中部分地使用基于图块的方法. 这意味着桌面和移动端都能在新的支持图块的API中收益, 如Vulkan Subpasses.
 
 Since we process all the geometry contributing to the image one tile at a time, it may not be necessary to read any previous value from the framebuffer - we can clear the image as part of the tile processing (as shown above) and avoid the bandwidth cost of a read unless we really need previous contents. It is often also possible to avoid writing the depth buffer to memory (not shown in the above example), since typically the depth value is only used during rendering and does not need to persist between frames.
 
