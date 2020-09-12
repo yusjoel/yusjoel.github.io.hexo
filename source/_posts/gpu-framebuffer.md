@@ -1,8 +1,10 @@
 ---
-title: 'GPU Framebuffer Memory: Understanding Tiling(WIP)'
+title: 'GPU帧缓冲内存: 了解图块化'
 date: 2020-09-03 10:43:09
-tags:
+tags: 翻译, TBR, GPU
 ---
+原文: [GPU Framebuffer Memory: Understanding Tiling](https://developer.samsung.com/galaxy-gamedev/resources/articles/gpu-framebuffer.html)
+
 现代的图形硬件在描绘的操作过程中有大量的内存的带宽需求. 增加外部的内存带宽代价非常的昂贵, 因为需要增加额外的空间和能源, 而对于移动设备的渲染来说尤其困难. 这篇文章要讨论基于图块的渲染, 这种渲染方法在大多数的移动图形硬件上使用, 并且逐步地向桌面硬件发展.
 
 ## 立即模式光栅器
@@ -12,14 +14,12 @@ tags:
 _下面的图片, 包括之后所有的图片, 都是左侧显示颜色缓冲, 右侧显示深度缓冲_
 
 ![简单的立即模式渲染过程](/gpu-framebuffer/images/tech_GPUFramebuffer_01.gif)
-简单的立即模式渲染过程
 
 这些三角形一提交就会被硬件处理, 如上图所示, 称之为立即模式渲染器(IMR). 过去, 桌面和主机的GPU的做法都可以概略地认为是这样.
 
 _在立即模式渲染器中, 图形渲染管线从上至下地处理各个原语, 逐原语的方式访问内存._
 
-![IMR管线](/gpu-framebuffer/images/tech_GPUFramebuffer_03-cn.svg)
-IMR管线
+![IMR管线](/gpu-framebuffer/images/tech_GPUFramebuffer_03 - cn.svg)
 
 ## 立即模式渲染器的内存使用
 
@@ -28,7 +28,6 @@ IMR管线
 _在下面这张图中, 图片的上方显示了内存中连续4个的缓存行在渲染过程中的情况. 在每个缓存行上方有一个小的矩形, 代表这个缓存行落在了帧缓冲的哪个位置: 红色线条代表缓存行被写入, 处于脏的状态, 绿色代表数据和内存一致, 处于干净的状态, 随着写入的时间推移, 红色会越来越浅. 而在下方的帧缓冲图像中, 颜色缓冲上粉红色代表脏的缓存行, 深度缓冲中则是用白色来代表._
 
 ![使用缓存行进行渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_06.gif)
-使用缓存行进行渲染
 
 ## 图块化内存
 
@@ -39,7 +38,6 @@ _在下面这张图中, 图片的上方显示了内存中连续4个的缓存行�
 _如下图所示, 此时的4个缓存行分别覆盖帧缓冲和深度缓冲上的一块正方形区域. 上方显示了覆盖区域在两个缓冲中的位置. 这些缓存行覆盖的像素和之前是一样多的._
 
 ![使用正方形的缓存图块进行渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_07.gif)
-使用正方形的缓存图块进行渲染
 
 ## 使用图块进行光栅化
 
@@ -50,7 +48,6 @@ _如下图所示, 此时的4个缓存行分别覆盖帧缓冲和深度缓冲上�
 _下面这个动画花费的时间比上一个动画长, 因为这个动画在三角形内的一个图块更新时都会截取一帧, 而上一个动画则是在一个三角形完成渲染后或者图块与内存之间进行了数据传输后才会截取一帧. 在真实的硬件上, 两者的性能应该是一致的, 并且, 如果上一个方法造成了缓存的抖动, 那么这个版本的性能会更优._
 
 ![一次渲染一个图块](/gpu-framebuffer/images/tech_GPUFramebuffer_10.gif)
-一次渲染一个图块
 
 我们还可以继续优化对内存的访问, 不要在处理完当前图块的一个三角形内的像素就处理下一个图块, 可以把场景中所有的三角形都处理完, 再移动到下一个图块. 这个就是基于图块的渲染器(TBR)所使用的优化方法.
 
@@ -61,110 +58,105 @@ TBR的第一步就是确定每个图块分别受到哪些三角形的影响. 一
 _下面这张图演示了场景中的各个三角形是如何分箱到12个图块中, 整个帧缓冲正好可以分成4x3个图块. 下方的帧缓冲显示当前提交的三角形, 上方则按照4x3的方式排列着12个缩小的帧缓冲, 每个帧缓冲只显示被分箱到对应图块的三角形, 图块对应的区域由一条红线框出._
 
 ![将三角形分箱](/gpu-framebuffer/images/tech_GPUFramebuffer_12.gif)
-将三角形分箱
 
 ## 基于图块的光栅化
 
 当三角形完成分箱后, 光栅器就可以按箱来进行处理, 每次只对一个图块的内存进行写入, 直到这个图块处理完毕. 由于每个图块只处理一次, 那么缓存就减少到了一个图块那么大. 这个顺序操作包含了清空帧缓冲, 在图块处理过程中, 整个帧缓冲都是脏的.
 
 ![按图块进行渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_14.gif)
-按图块进行渲染
 
 _渲染分成了两个阶段: 分箱, 这步需要写内存; 光栅化, 需要读取箱内数据. 几何数据的中间存储相对于帧缓冲一般而言是更小的, 并且会顺序地进行访问._
 
-![](/gpu-framebuffer/images/tech_GPUFramebuffer_16-cn.svg)
+![](/gpu-framebuffer/images/tech_GPUFramebuffer_16 - cn.svg)
 
 由于需要等到所有的几何数据提交完毕才能开始光栅化, 所以和立即模式相比, 基于图块的渲染会有一个延迟. 而这个延迟带来的回报则是减少带宽, 增快光栅化速度. 在某些TBR的硬件上, 分箱和光栅化是流水线化的. 因此, 任何限制了并行性的操作都会造成性能问题, 比如说一个顶点着色器需要使用前一帧的输出, 一个纹理每一帧都会修改, 并且没有使用双缓冲. 另外, 某些TBR的硬件限制了分箱阶段的几何数据的数量.
 
 尽管如此, 带宽的节省对于移动设备来说还是最重要的, 所以几乎所有的移动设备都使用了TBR. 甚至传统的桌面IMR供应商也在他们的新硬件中部分地使用基于图块的方法. 这意味着桌面和移动端都能在新的支持图块的API中收益, 如Vulkan Subpasses.
 
-Since we process all the geometry contributing to the image one tile at a time, it may not be necessary to read any previous value from the framebuffer - we can clear the image as part of the tile processing (as shown above) and avoid the bandwidth cost of a read unless we really need previous contents. It is often also possible to avoid writing the depth buffer to memory (not shown in the above example), since typically the depth value is only used during rendering and does not need to persist between frames.
+由于我们要一次处理一个图块上的所有三角形, 所以不太必要去读取帧缓冲上的前一帧的数据, 可以把数据清空当成图块处理的一部分, 也可以避免一次读取的带宽消耗, 除非我们真的一定要读取前一帧的数据. 同样大多数情况也不需要对内存中的深度缓冲进行写入, 因为大多情况深度值都是在渲染过程中使用的, 并不需要在帧与帧之间保存.
 
-External traffic to the framebuffer is now limited to one write per tile - although these writes include clearing the framebuffer to a background color when no other primitives were there.
+帧缓冲对外的数据往来只有每个图块的一次写入, 如果这个图块上没有三角形被渲染, 也需要用背景色来清空帧缓冲.
 
-## Multisampling
+## 多重采样
 
-Tile-based rendering also provides a low-bandwidth way to implement antialiasing: we can render to the tiles normally, and average pixel values as part of the operation of writing the tile memory. This downsampling step is known as "resolving" the tile buffer. When multisampling (as opposed to supersampling), not every on-chip pixel is shaded.
+TBR提供了一个低带宽消耗的方法来实现反走样: 我们可以正常地渲染一个图块, 在写入内存时把对像素求平均作为操作的一部分. 这步对图块缓冲的降采样被称作解析. 当进行多重采样时(对应于超采样), 并不是所有的片上像素都被着色.
 
-If the tile buffer is of a fixed size, antialiasing means the image must be divided into more tiles, and there are more writes from tile memory to the framebuffer - but the total amount of memory transferred to the framebuffer is unaffected by the degree of multisampling. The full-resolution version of the framebuffer (the version that has not been downsampled) never needs to be written to memory, so long as no further processing is done to the same render target. This can save a lot of bandwidth, and for simple scenes makes multisampling almost free.
+如果图块缓冲是固定大小的, 那么反走样意味着图像需要分割为更多个图块, 从图块缓冲到帧缓冲的写入次数会更多, 但是总的写入量却是不受多重采样的级数的影响. 完整分辨率版本的帧缓存, 也就是降采样之前的那个版本, 是不需要写入到内存的, 只要对这个渲染对象没有其他操作. 这能节省大量的带宽, 对于简单的场景, 多重采样几乎是没有代价的.
 
-_In this animation, 2x2 antialiasing has made the tile coverage in the framebuffer smaller, so more passes are needed. The geometry rasterized in the tile memory is double-sized, and shrunk when written to the framebuffer. The depth buffer is only needed on-chip, not in main memory, so only the color aspect of the full framebuffer is shown - the on-chip depth value is discarded once the tile is processed._
+_在下面这个动画中, 使用了2x2的反走样, 所以使得图块在帧缓冲中占据的面积变小了, 于是需要更多的步数. 光栅化后的几何体在图块内存中占用的空间会翻番, 但在写入到帧缓冲时会压缩. 深度缓冲只需要在片上即可, 不需要写入到内存, 所以整个帧缓冲只显示了颜色缓冲, 片上的深度值在图块处理完成后就会被抛弃._
 
-![Multisampled tiled rendering](/gpu-framebuffer/images/tech_GPUFramebuffer_19.gif)
-Multisampled tiled rendering
+![TBR中的多重采样](/gpu-framebuffer/images/tech_GPUFramebuffer_19.gif)
 
-## Traditional deferred shading
+## 传统的延迟着色
 
-It is not normally possible to read from the framebuffer attachment during the process of rendering to it. Nonetheless, some techniques rely on being able to read back the result of previous rendering operations.
+在渲染的过程当中, 一般来时是不能去读取帧缓冲内的数据的. 但有些技术依赖于读取前一次写入操作的结果.
 
-One such technique is "deferred rendering": only basic information is recorded as each primitive is rasterized, then a second pass is made over the rendered scene, using this recorded information as input to the shading operations per pixel. Deferred rendering can reduce the number of required costly state changes, and increase the potential parallelism available to fragment shaders.
+其中一个技术就是延迟渲染: 只有基础的信息会在三角形光栅化是会被记录下来, 然后下一步使用记录下来的信息作为像素着色操作的输入值, 来渲染整个场景. 延迟渲染可以减少开销较大的状态切换, 增加片元着色器潜在的并发性.
 
-A simple implementation of deferred rendering has a high bandwidth cost, since the entire framebuffer, including all per-pixel values, must be read and written for the deferred shading pass.
+一个简单的延迟渲染的实现是非常消耗带宽的, 因为整个帧缓冲, 包括所有逐像素的值, 都会在延迟着色过程中进行读和写操作.
 
-_This example shows the cache behavior in a simple deferred shading implementation. The first pass simply records the Phong-interpolated surface normal. The second pass reads this information for every pixel in the image and uses the interpolated normal for lighting calculations - reading and writing every image line in the process._
+_下面这个例子演示了一个简单的延迟着色的实现中缓存的行为. 第一步简单地记录了Phong氏内插的表面法线, 第二步读取图像中每个像素的信息, 然后使用读取到的法线数据进行光照的计算, 图像中每一行的处理都包括读取和写入两次操作._
 
-![Deferred shading with an IMR](/gpu-framebuffer/images/tech_GPUFramebuffer_21.gif)
-Deferred shading with an IMR
+![IMR中的延迟渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_21.gif)
 
-## Tiling and deferred shading
+## 图块化与延迟着色
 
-Because deferred shading (and the related deferred lighting approach) require only the contents of the current pixel to be read, the scene can still be processed one tile at a time. Only the final result of the shading pass needs to be written to the framebuffer.
+由于延迟着色以及相关的延迟光照技术只需要读取当前像素的数据, 所以整个场景还是可以以图块为单位进行处理. 只有最后的结果需要写入到帧缓冲中.
 
-To achieve this in Vulkan, the entire sequence of rendering is treated as a single render pass, and the geometry and shading operations are each contained in a subpass. In OpenGL ES, a similar approach is possible less formally with Pixel Local Storage. With these approaches, the memory access cost of deferred shading is no greater than for simple rendering - and there is still no need to write the depth buffer.
+在Vulkan中的实现是这样的, 整个渲染的过程被当成单次渲染通道, 几何与着色过程被包含在两个子通道中. 在OpenGL ES中也能使用Pixel Local Storage达成类似的方案, 就是不那么正式. 使用这些方法, 延迟着色对于内存访问的消耗就不会比一般的渲染方式来的更大, 而且一样的, 也不需要写入深度缓冲.
 
-_This example shows deferred shading in a tile-based renderer: the triangle rasterisation and the subsequent shading pass proceed within the tile memory, with only the RGB shading result being written out to the framebuffer._
+_下面这个例子演示了TBR下的延迟着色: 三角形先光栅化, 接着在图块内存下进行着色, 只有最终的着色结果, 颜色的RGB值会被写入到帧缓冲中._
 
-![Tiled deferred shading](/gpu-framebuffer/images/tech_GPUFramebuffer_23.gif)
-Tiled deferred shading
+![TBR中的延迟渲染](/gpu-framebuffer/images/tech_GPUFramebuffer_23.gif)
 
-## Advantages of tile-based rendering
+## TBR的优点
 
-*   Frame buffer memory bandwidth is greatly reduced, reducing power and increasing speed.
+*   帧缓冲的内存带宽大大降低, 节省能源和提高速度.
 
-        *   Mobile memory is typically slower and lower power than desktop systems, and bandwidth is shared with the CPU, so access is very costly.
+*   移动设备的内存一般来说比桌面端慢, 能源也少, 带宽和CPU共享, 所以访问内存开销很大.
 
-*   With API support, off-chip memory requirements may also be reduced (it may not be necessary to allocate an off-chip Z buffer at all, for example).
+*   有了API的支持, 片外的内存需求可以减少, 比如可能就不再需要片外的深度缓冲了.
 
-*   Texture cache performance can be improved (textures covering multiple primitives may be accessed more coherently one tile at a time than one primitive at a time.
+*   纹理缓存的性能会提升, 如果有多个三角形使用了同一个纹理的话, 按照图块来访问纹理会比按照三角形来访问更效率.
 
-*   Much less on-chip space is needed for good performance compared with a general-purpose frame buffer cache.
+*   比起一个通用的帧缓冲缓存来说更节约片上的空间.
 
-        *   This means that more space can be dedicated to texture cache, further reducing bandwidth.
+*   可以留出更多空间给纹理缓存, 进一步减少带宽.
 
-## Limitations of tile-based rendering
+## TBR的限制
 
-While there are many performance advantages to tile-based rendering, there are some restrictions imposed by the technique:
+在TBR带来多个性能上的好处之时, 它也有着不少技术上的限制:
 
-*   The two-stage binning and fragment passes introduce latency
+*   分箱和片元着色这两步操作会带来延迟
 
-        *   This latency should be hidden by pipelining and improved performance, but makes some operations relatively more costly
+*   这个延迟可能被流水线隐藏, 并提升了性能, 但也会造成某些操作的开销变的更大
 
-        *   In pipelined tiled rendering, framebuffer and textures required for rendering should be double-buffered so as to avoid stalling the pipeline
+*   帧缓冲和需要进行渲染的纹理必须进行双缓冲, 这样才能避免停滞流水线
 
-*   Framebuffer reads that might fall outside the current fragment are relatively more costly
+*   对帧缓冲的读取如果超出了当前的片元, 则会开销很大
 
-        *   Operations such as screen-space ray tracing require writing all the framebuffer data - removing the ability to discard full-resolution images and depth values after use
+*   哪些要对整个帧缓冲进行写入的操作, 如屏幕空间的光线追踪, 会让TBR像以往那样在抛弃完整分辨率的图像和深度值
 
-*   There is a cost to traversing the geometry repeatedly
+*   重复遍历几何体也有一个额外的开销
 
-        *   Scenes that are vertex-shader bound may have increased overhead in a tiler
+*   对于顶点着色本身就是瓶颈的场景来说, 反而会增加开销
 
-*   The binning pass may have limitations
+*   分箱操作本身有限制
 
-        *   Some implementations may run out of space for binning primitives in very complex scenes, or may have optimizations that are bypassed by unusual input (such as highly irregular geometry)
+*   有些实现在非常复杂的场景中进行分箱可能会耗尽空间, 或者在遇到一些不寻常的输入时进行优化
 
-*   Switching to a different render target and back involves flushing all working data to memory and later reading it back
+*   切换到其他渲染对象后再切换回来, 会把所有的数据写入到内存, 并在之后读取回来
 
-        *   For a tiler, it is especially important that shadow and environment maps be generated before the main frame buffer, not "on demand" during final rendering (though this is good advice for most GPUs)
+*   对于TBR, 很重要的一点是阴影映射纹理以及环境映射纹理都要事先准备好, 而不是在最终渲染过程中需要时才生成处理, 这对于大多数GPU都是一条好的建议
 
-*   Graphics state (such as shaders) may change more frequently and less predictably
+*   状态(如着色器)的切换会更频繁, 更难以预测
 
-        *   Geometry that is "skipped" means that states do not necessarily follow in turn, making incremental state updates hard to implement
+*   被跳过的几何体意味着状态不需要跟随, 这让增量的状态更新难以实现
 
-In most cases, the behavior of a tile-based GPU should not be appreciably worse than for an immediate-mode renderer using similarly limited hardware (indeed, some hardware can choose whether or not to run in a tiled mode), but it is possible to remove the performance benefits of tile-based rendering with the wrong use pattern.
+在大多数情况下, 基于图块的GPU表现不会比立即模式的GPU差, 如果两者的硬件配置相当的话, 事实上, 有种GPU可以在这两个模式之间进行切换, 但是使用了错误的模式的话丧失TBR带来的优点.
 
-## Summary
+## 总结
 
-Tile-based rendering is a technique used by modern GPUs to reduce the bandwidth requirements of accessing off-chip framebuffer memory. Almost ubiquitous in the mobile space where external memory access is costly and rendering demands have historically been lower, desktop GPUs are now beginning to make use of partially-tile-based rendering as well.
+TBR是现代GPU用于减小访问片外帧缓冲内存带宽的一种技术. 在移动端被广泛地使用, 因为外部内存的访问开销巨大, 渲染的需求则较低. 在桌面端GPU也开始部分使用TBR.
 
-Vulkan has specific features intended to make the best use of tile-based renderers, including control over whether to load or clear previous framebuffer content, whether to discard or write attachment contents and control over attachment resolving, and subpasses. OpenGL ES can achieve similar behavior with extensions, but these are not universally supported. To get the best performance from current and future GPUs, it is important to make proper use of the API so that tile-based rendering can proceed efficiently.
+Vulkan有特定的功能用于发挥TBR的最佳性能, 包括控制加载或是清空上一次的帧缓冲内容, 是写入还是抛弃附件内容, 控制附件的解析和次通道. OpenGL ES可以通过扩展来完成类似行为, 但并不通用. 要在当前乃至未来的GPU上获得最佳的性能, 必须要正确地使用这些API, 才能让TBR更有效地发挥作用.
