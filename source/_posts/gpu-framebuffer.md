@@ -1,7 +1,10 @@
 ---
 title: 'GPU帧缓冲内存: 了解图块化'
 date: 2020-09-03 10:43:09
-tags: 翻译, TBR, GPU
+tags: 
+- 翻译
+- TBR
+- GPU
 ---
 原文: [GPU Framebuffer Memory: Understanding Tiling](https://developer.samsung.com/galaxy-gamedev/resources/articles/gpu-framebuffer.html)
 

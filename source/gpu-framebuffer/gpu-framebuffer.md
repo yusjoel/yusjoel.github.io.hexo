@@ -120,7 +120,7 @@ Tiled deferred shading
 
 *   Frame buffer memory bandwidth is greatly reduced, reducing power and increasing speed.
 
-        *   Mobile memory is typically slower and lower power than desktop systems, and bandwidth is shared with the CPU, so access is very costly.
+*   Mobile memory is typically slower and lower power than desktop systems, and bandwidth is shared with the CPU, so access is very costly.
 
 *   With API support, off-chip memory requirements may also be reduced (it may not be necessary to allocate an off-chip Z buffer at all, for example).
 
@@ -128,7 +128,7 @@ Tiled deferred shading
 
 *   Much less on-chip space is needed for good performance compared with a general-purpose frame buffer cache.
 
-        *   This means that more space can be dedicated to texture cache, further reducing bandwidth.
+*   This means that more space can be dedicated to texture cache, further reducing bandwidth.
 
 ## Limitations of tile-based rendering
 
@@ -136,29 +136,29 @@ While there are many performance advantages to tile-based rendering, there are s
 
 *   The two-stage binning and fragment passes introduce latency
 
-        *   This latency should be hidden by pipelining and improved performance, but makes some operations relatively more costly
+*   This latency should be hidden by pipelining and improved performance, but makes some operations relatively more costly
 
-        *   In pipelined tiled rendering, framebuffer and textures required for rendering should be double-buffered so as to avoid stalling the pipeline
+*   In pipelined tiled rendering, framebuffer and textures required for rendering should be double-buffered so as to avoid stalling the pipeline
 
 *   Framebuffer reads that might fall outside the current fragment are relatively more costly
 
-        *   Operations such as screen-space ray tracing require writing all the framebuffer data - removing the ability to discard full-resolution images and depth values after use
+*   Operations such as screen-space ray tracing require writing all the framebuffer data - removing the ability to discard full-resolution images and depth values after use
 
 *   There is a cost to traversing the geometry repeatedly
 
-        *   Scenes that are vertex-shader bound may have increased overhead in a tiler
+*   Scenes that are vertex-shader bound may have increased overhead in a tiler
 
 *   The binning pass may have limitations
 
-        *   Some implementations may run out of space for binning primitives in very complex scenes, or may have optimizations that are bypassed by unusual input (such as highly irregular geometry)
+*   Some implementations may run out of space for binning primitives in very complex scenes, or may have optimizations that are bypassed by unusual input (such as highly irregular geometry)
 
 *   Switching to a different render target and back involves flushing all working data to memory and later reading it back
 
-        *   For a tiler, it is especially important that shadow and environment maps be generated before the main frame buffer, not "on demand" during final rendering (though this is good advice for most GPUs)
+*   For a tiler, it is especially important that shadow and environment maps be generated before the main frame buffer, not "on demand" during final rendering (though this is good advice for most GPUs)
 
 *   Graphics state (such as shaders) may change more frequently and less predictably
 
-        *   Geometry that is "skipped" means that states do not necessarily follow in turn, making incremental state updates hard to implement
+*   Geometry that is "skipped" means that states do not necessarily follow in turn, making incremental state updates hard to implement
 
 In most cases, the behavior of a tile-based GPU should not be appreciably worse than for an immediate-mode renderer using similarly limited hardware (indeed, some hardware can choose whether or not to run in a tiled mode), but it is possible to remove the performance benefits of tile-based rendering with the wrong use pattern.
 
