@@ -29,3 +29,12 @@ tags:
 
 其他参考文章:
 [Flat、Gouraud、Phong Shading 着色方法对比](https://hijiangtao.github.io/2019/09/19/Shading-Methods-Comparison/)
+
+# buffer vs cache
+
+# latency vs defer
+
+# thrash the cache
+
+# binning
+Sorting triangles into bins
